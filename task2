@@ -1,0 +1,67 @@
+import socket
+import subprocess
+import requests
+from packaging import version
+
+# Function to scan open ports
+def scan_open_ports(ip, start_port, end_port):
+    open_ports = []
+    for port in range(start_port, end_port + 1):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        socket.setdefaulttimeout(1)
+        result = sock.connect_ex((ip, port))
+        if result == 0:
+            open_ports.append(port)
+        sock.close()
+    return open_ports
+
+# Function to check outdated software versions (example for HTTP services)
+def check_software_version(url, software_name, current_version):
+    try:
+        response = requests.get(url)
+        if software_name in response.headers.get('Server', ''):
+            server_version = response.headers.get('Server').split(software_name)[-1].strip()
+            if version.parse(server_version) < version.parse(current_version):
+                return f"Outdated {software_name} version: {server_version}. Current version: {current_version}"
+            else:
+                return f"{software_name} is up to date."
+    except requests.exceptions.RequestException as e:
+        return f"Error checking software version: {e}"
+
+# Function to identify potential misconfigurations (example for HTTP services)
+def check_http_security_headers(url):
+    try:
+        response = requests.get(url)
+        missing_headers = []
+        security_headers = ['Strict-Transport-Security', 'Content-Security-Policy', 'X-Content-Type-Options', 'X-Frame-Options', 'X-XSS-Protection']
+        for header in security_headers:
+            if header not in response.headers:
+                missing_headers.append(header)
+        return missing_headers
+    except requests.exceptions.RequestException as e:
+        return f"Error checking HTTP security headers: {e}"
+
+# Main function to run the scan
+def run_scan(target_ip, url, software_name, current_version):
+    print(f"Scanning open ports on {target_ip}...")
+    open_ports = scan_open_ports(target_ip, 1, 1024)
+    print(f"Open ports: {open_ports}")
+
+    print(f"Checking software version for {software_name} at {url}...")
+    software_version_status = check_software_version(url, software_name, current_version)
+    print(software_version_status)
+
+    print(f"Checking HTTP security headers for {url}...")
+    missing_headers = check_http_security_headers(url)
+    if missing_headers:
+        print(f"Missing security headers: {missing_headers}")
+    else:
+        print("All necessary security headers are present.")
+
+if __name__ == "__main__":
+    target_ip = "192.168.1.1"  # Replace with the target IP
+    url = "http://example.com"  # Replace with the target URL
+    software_name = "Apache"  # Replace with the software name to check
+    current_version = "2.4.51"  # Replace with the current software version
+
+    run_scan(target_ip, url, software_name, current_version)
